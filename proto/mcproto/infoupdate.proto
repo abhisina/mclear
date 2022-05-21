@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package mcproto;
+
+import "mcproto/cpuloadinfo.proto";
+import "mcproto/diskinfo.proto";
+import "mcproto/memoryinfo.proto";
+import "mcproto/networkinfo.proto";
+
+message Stats
+{
+	CpuLoadInfo cpuLoad = 1;
+	DiskInfo diskinfo   = 2;
+	MemoryInfo meminfo  = 3;
+	NetworkInfo netinfo = 4;
+	string hostname     = 5;
+}
+
+message Empty {}
+
+service InfoUpdate 
+{
+	rpc SendStats(Stats) returns (Empty);
+}

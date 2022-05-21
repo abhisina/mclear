@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+package mcproto;
+
+message MemoryInfo
+{
+    uint64 availableRam         = 1;
+    uint64 availableSwap        = 2;
+    uint32 availableRamPercent  = 3;
+    uint32 availableSwapPercent = 4;
+    float avg10ProcessStallTime = 5;
+}

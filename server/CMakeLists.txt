@@ -1,0 +1,5 @@
+file(GLOB SRC_FILES "*.cpp")
+find_package(Threads REQUIRED)
+add_executable(mclearsrv ${SRC_FILES})
+target_link_libraries(mclearsrv PRIVATE project_options mcproto Threads::Threads ${grpc++_alts_LIB_DEPENDS})
+target_include_directories(mclearsrv PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
