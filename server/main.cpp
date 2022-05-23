@@ -23,8 +23,9 @@
 #include <grpc/grpc.h>
 #include <grpcpp/server_builder.h>
 
-#include <queue>
 #include <mutex>
+#include <set>
+#include <unordered_map>
 
 class InfoUpdateService final : public mcproto::InfoUpdate::Service
 {
@@ -43,40 +44,42 @@ class InfoUpdateService final : public mcproto::InfoUpdate::Service
 
     struct compare
     {
-        bool operator()(const Stat& l, const Stat& r)
+        bool operator()(const Stat* l, const Stat* r) const
         {
-            // TODO factor out ordering based on different stats
-            return false;
+            return l->cpuIdlePercent > r->cpuIdlePercent &&
+            l->diskSpaceAvailable > r->diskSpaceAvailable &&
+            l->networkBandwidthUsed < r->networkBandwidthUsed &&
+            (l->ramUsedPercent + l->swapUsedPercent) > (r->ramUsedPercent + r->swapUsedPercent);
         }
     };
 
-    std::priority_queue<Stat, std::vector<Stat>, compare> nodes;
-    std::unordered_set<std::string> hosts;
+    std::set<Stat*, compare> node_list;
+    std::unordered_map<std::string, Stat*> node_list_mapping;
     std::mutex protect;
 
 public:
     virtual ::grpc::Status SendStats(::grpc::ServerContext* context, const ::mcproto::Stats* request, ::mcproto::Empty* response) override
     {
-        Stat stat;
+        Stat* stat = new Stat;
         std::cout << "hostname: " << request->hostname() << '\n';
-        stat.hostanme = request->hostname();
+        stat->hostanme = request->hostname();
 
         if(request->has_cpuload())
         {
             std::cout << "Cpu Load(%): " << double(request->cpuload().cpuload()) / 100. << '\n';
-            stat.cpuIdlePercent = 100. - double(request->cpuload().cpuload()) / 100.;
+            stat->cpuIdlePercent = 100. - double(request->cpuload().cpuload()) / 100.;
         }
 
         if(request->has_diskinfo())
         {
             std::cout << "DiskSpace(KB): " << request->diskinfo().availablespace() << '\n';
-            stat.diskSpaceAvailable = request->diskinfo().availablespace();
+            stat->diskSpaceAvailable = request->diskinfo().availablespace();
         }
 
         if(request->has_netinfo())
         {
             std::cout << "Network Speed(bytes/sec): " << request->netinfo().bandwidthusage() << '\n';
-            stat.networkBandwidthUsed = request->netinfo().bandwidthusage();
+            stat->networkBandwidthUsed = request->netinfo().bandwidthusage();
         }
 
         if(request->has_meminfo())
@@ -87,23 +90,23 @@ public:
             std::cout << "Available Ram(%): " << request->meminfo().availablerampercent() << '\n';
             std::cout << "Available Swap(%): " << request->meminfo().availableswappercent() << '\n';
             std::cout << "Avg10 stall info(us): " << request->meminfo().avg10processstalltime() << '\n';
-            stat.ramUsedPercent = request->meminfo().availablerampercent();
-            stat.swapUsedPercent = request->meminfo().availableswappercent();
+            stat->ramUsedPercent = request->meminfo().availablerampercent();
+            stat->swapUsedPercent = request->meminfo().availableswappercent();
         }
 
         std::cout << "============================================================" << std::endl;
 
         std::lock_guard<std::mutex> guard(protect);
-        // TODO: factor out existing node
-        if(hosts.find(stat.hostanme) != hosts.end())
+        auto node_iter = node_list_mapping.find(stat->hostanme);
+        if(node_iter != node_list_mapping.cend())
         {
-            hosts.insert(stat.hostanme);
-            nodes.push(stat);
+            node_list.erase(node_iter->second);
+            node_list_mapping.erase(node_iter);
+            delete node_iter->second;
         }
-        else
-        {
-            // TODO:
-        }
+
+        node_list_mapping.insert(std::make_pair(stat->hostanme, stat));
+        node_list.insert(stat);
 
         return grpc::Status::OK;
     }
