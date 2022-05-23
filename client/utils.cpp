@@ -48,7 +48,7 @@ void Utils::initializeService()
 {
     Daemonize::initiate("mclearcli.out", "mclearcli.err", "mclearcli.pid");
     std::cout << "Daemonize suceeded!" << std::endl;
-    // TODO: Tweak the memorylock call to work with newer threads or look for alternative
+
     //LockMemory::lock();
     //std::cout << "Memory locking succeeded" << std::endl;
     AdjOOMScore::adjust(-500);
